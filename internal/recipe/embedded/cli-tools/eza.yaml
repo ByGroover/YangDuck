@@ -4,6 +4,8 @@ type: cli-tool
 description: 现代化的 ls 替代品，带颜色、图标和 Git 状态
 tags: [productivity, file, essential]
 difficulty: beginner
+popularity: 80
+added_at: "2025-01-15"
 install:
   method: brew
   package: eza

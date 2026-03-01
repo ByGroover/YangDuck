@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -44,9 +45,8 @@ func main() {
 
 	root.AddCommand(
 		installCmd(reg, cfg),
-		searchCmd(reg, cfg),
-		browseCmd(reg, cfg),
-		listCmd(reg, cfg),
+		searchCmd(reg),
+		listCmd(reg),
 		doctorCmd(),
 		configCmd(cfg),
 		updateCmd(),
@@ -84,9 +84,10 @@ func installCmd(reg *recipe.Registry, cfg *config.Config) *cobra.Command {
 		Short: "安装配方",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if bundleFlag != "" {
-				return installBundle(reg, bundleFlag)
+				return installBundle(reg, cfg, bundleFlag)
 			}
 			brew := installer.NewBrewInstaller()
+			npm := installer.NewNpmInstaller()
 			mcp := installer.NewMCPInstaller()
 			skill := installer.NewSkillInstaller()
 			for _, id := range args {
@@ -102,30 +103,51 @@ func installCmd(reg *recipe.Registry, cfg *config.Config) *cobra.Command {
 					if rec.Install == nil {
 						continue
 					}
-					if installed, _ := brew.IsInstalled(rec.Install.Package); installed {
-						ylog.S.Debugw("already installed", "package", rec.Install.Package)
-						fmt.Println(successStyle.Render("✓ " + rec.Name + " 已安装"))
-						continue
+					if rec.Install.Method == "npm" {
+						if installed, _ := npm.IsInstalled(rec.Install.Package); installed {
+							fmt.Println(successStyle.Render("✓ " + rec.Name + " 已安装"))
+							continue
+						}
+						fmt.Printf("正在安装 %s...\n", rec.Name)
+						if err := npm.Install(rec.Install.Package); err != nil {
+							ylog.S.Errorw("npm install failed", "package", rec.Install.Package, "error", err)
+							fmt.Println(errorStyle.Render("✗ " + err.Error()))
+							continue
+						}
+						fmt.Println(successStyle.Render("✓ " + rec.Name + " 安装完成"))
+					} else {
+						if installed, _ := brew.IsInstalled(rec.Install.Package); installed {
+							ylog.S.Debugw("already installed", "package", rec.Install.Package)
+							fmt.Println(successStyle.Render("✓ " + rec.Name + " 已安装"))
+							continue
+						}
+						fmt.Printf("正在安装 %s...\n", rec.Name)
+						if err := brew.Install(rec.Install.Package); err != nil {
+							ylog.S.Errorw("brew install failed", "package", rec.Install.Package, "error", err)
+							fmt.Println(errorStyle.Render("✗ " + err.Error()))
+							continue
+						}
+						_ = brew.RunPostInstall(rec.Install.PostInstall)
+						ylog.S.Infow("installed", "package", rec.Install.Package)
+						fmt.Println(successStyle.Render("✓ " + rec.Name + " 安装完成"))
 					}
-					fmt.Printf("正在安装 %s...\n", rec.Name)
-					if err := brew.Install(rec.Install.Package); err != nil {
-						ylog.S.Errorw("brew install failed", "package", rec.Install.Package, "error", err)
-						fmt.Println(errorStyle.Render("✗ " + err.Error()))
-						continue
-					}
-					_ = brew.RunPostInstall(rec.Install.PostInstall)
-					ylog.S.Infow("installed", "package", rec.Install.Package)
-					fmt.Println(successStyle.Render("✓ " + rec.Name + " 安装完成"))
 					if cfg.IsBeginner() {
 						quickstart.Show(rec)
 					}
 				case recipe.TypeMCP:
-					targets := []string{"cursor"}
-					if rec.Targets != nil && rec.Targets.ClaudeCode != nil {
+					if cfg.Editor == "" {
+						askEditor(cfg)
+					}
+					var targets []string
+					if rec.Targets != nil && rec.Targets.Cursor != nil && cfg.ShouldInstallFor("cursor") {
+						targets = append(targets, "cursor")
+					}
+					if rec.Targets != nil && rec.Targets.ClaudeCode != nil && cfg.ShouldInstallFor("claude-code") {
 						targets = append(targets, "claude-code")
 					}
+					promptValues := collectPrompts(rec.Prompts)
 					for _, t := range targets {
-						if err := mcp.Install(&rec, t, nil); err != nil {
+						if err := mcp.Install(&rec, t, promptValues); err != nil {
 							ylog.S.Errorw("mcp install failed", "target", t, "recipe", rec.ID, "error", err)
 							fmt.Println(errorStyle.Render("✗ " + t + ": " + err.Error()))
 						} else {
@@ -133,6 +155,9 @@ func installCmd(reg *recipe.Registry, cfg *config.Config) *cobra.Command {
 							fmt.Println(successStyle.Render("✓ " + rec.Name + " 已配置到 " + t))
 							if t == "cursor" {
 								fmt.Println(mutedStyle.Render("  ℹ 配置已写入 .cursor/mcp.json，仅在当前项目中生效。如需在其他项目使用，请在对应项目目录重新运行安装。"))
+							}
+							if t == "claude-code" {
+								fmt.Println(mutedStyle.Render("  ℹ 配置已写入 ~/.claude.json，全局生效。"))
 							}
 						}
 					}
@@ -153,13 +178,20 @@ func installCmd(reg *recipe.Registry, cfg *config.Config) *cobra.Command {
 	return cmd
 }
 
-func installBundle(reg *recipe.Registry, id string) error {
+func installBundle(reg *recipe.Registry, cfg *config.Config, id string) error {
 	rec, ok := reg.Get(id)
 	if !ok {
 		return fmt.Errorf("套餐未找到: %s", id)
 	}
 	bi := installer.NewBundleInstaller(reg)
-	result, err := bi.Install(&rec, nil, []string{"cursor"})
+	var targets []string
+	if cfg.ShouldInstallFor("cursor") {
+		targets = append(targets, "cursor")
+	}
+	if cfg.ShouldInstallFor("claude-code") {
+		targets = append(targets, "claude-code")
+	}
+	result, err := bi.Install(&rec, nil, targets)
 	if err != nil {
 		return err
 	}
@@ -172,69 +204,74 @@ func installBundle(reg *recipe.Registry, id string) error {
 	return nil
 }
 
-func browseCmd(reg *recipe.Registry, cfg *config.Config) *cobra.Command {
-	var installedFlag bool
-	cmd := &cobra.Command{
-		Use:   "browse [category]",
-		Short: "浏览配方（进入 TUI 浏览界面）",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if installedFlag {
-				app := tui.NewApp(reg, cfg)
-				return app.RunBrowse("__installed__")
-			}
-			category := ""
-			if len(args) > 0 {
-				category = args[0]
-			}
-			app := tui.NewApp(reg, cfg)
-			return app.RunBrowse(category)
-		},
-	}
-	cmd.Flags().BoolVar(&installedFlag, "installed", false, "进入已安装页")
-	return cmd
-}
-
-func searchCmd(reg *recipe.Registry, cfg *config.Config) *cobra.Command {
+func searchCmd(reg *recipe.Registry) *cobra.Command {
 	return &cobra.Command{
 		Use:   "search <keyword>",
-		Short: "搜索配方（进入 TUI 搜索界面）",
+		Short: "搜索配方",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			app := tui.NewApp(reg, cfg)
-			return app.RunSearch(args[0])
+		Run: func(cmd *cobra.Command, args []string) {
+			results := reg.Search(args[0])
+			if len(results) == 0 {
+				fmt.Println("未找到匹配的配方")
+				return
+			}
+			typeNames := recipeTypeNames()
+			for _, r := range results {
+				fmt.Printf("  %s  %s  %s\n", typeNames[r.Type], r.ID, mutedStyle.Render(r.Description))
+			}
 		},
 	}
 }
 
-func listCmd(reg *recipe.Registry, cfg *config.Config) *cobra.Command {
+func listCmd(reg *recipe.Registry) *cobra.Command {
 	var installedFlag bool
 	var bundlesFlag bool
-	var quietFlag bool
 	cmd := &cobra.Command{
-		Use:     "list",
-		Short:   "列出可用配方（browse 的别名）",
-		Aliases: []string{},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if quietFlag {
-				return listQuiet(reg, installedFlag, bundlesFlag)
-			}
-			category := ""
+		Use:   "list",
+		Short: "列出可用配方",
+		Run: func(cmd *cobra.Command, args []string) {
+			typeNames := recipeTypeNames()
+
 			if bundlesFlag {
-				category = "bundle"
+				for _, b := range reg.Bundles() {
+					fmt.Printf("  📦 %s  %s  (%d 个工具)\n", b.ID, mutedStyle.Render(b.Description), len(b.Includes))
+				}
+				return
 			}
-			app := tui.NewApp(reg, cfg)
-			return app.RunBrowse(category)
+
+			brew := installer.NewBrewInstaller()
+			npm := installer.NewNpmInstaller()
+			for _, r := range reg.All() {
+				if installedFlag {
+					switch r.Type {
+					case recipe.TypeCLITool:
+						if r.Install == nil {
+							continue
+						}
+						if r.Install.Method == "npm" {
+							if ok, _ := npm.IsInstalled(r.Install.Package); !ok {
+								continue
+							}
+						} else {
+							if ok, _ := brew.IsInstalled(r.Install.Package); !ok {
+								continue
+							}
+						}
+					default:
+						continue
+					}
+				}
+				fmt.Printf("  %s  %s  %s\n", typeNames[r.Type], r.ID, mutedStyle.Render(r.Description))
+			}
 		},
 	}
 	cmd.Flags().BoolVar(&installedFlag, "installed", false, "仅显示已安装的")
 	cmd.Flags().BoolVar(&bundlesFlag, "bundles", false, "仅显示套餐")
-	cmd.Flags().BoolVar(&quietFlag, "quiet", false, "纯文本输出（给脚本用）")
 	return cmd
 }
 
-func listQuiet(reg *recipe.Registry, installedOnly bool, bundlesOnly bool) error {
-	typeNames := map[recipe.RecipeType]string{
+func recipeTypeNames() map[recipe.RecipeType]string {
+	return map[recipe.RecipeType]string{
 		recipe.TypeCLITool: "🔧 CLI",
 		recipe.TypeMCP:     "🔌 MCP",
 		recipe.TypeSkill:   "📝 Skill",
@@ -242,27 +279,6 @@ func listQuiet(reg *recipe.Registry, installedOnly bool, bundlesOnly bool) error
 		recipe.TypeRule:    "📏 Rule",
 		recipe.TypeBundle:  "📦 Bundle",
 	}
-
-	if bundlesOnly {
-		for _, b := range reg.Bundles() {
-			fmt.Printf("  📦 %s  %s  (%d 个工具)\n", b.ID, mutedStyle.Render(b.Description), len(b.Includes))
-		}
-		return nil
-	}
-
-	brew := installer.NewBrewInstaller()
-	for _, r := range reg.All() {
-		prefix := typeNames[r.Type]
-		status := ""
-		if installedOnly && r.Type == recipe.TypeCLITool && r.Install != nil {
-			if ok, _ := brew.IsInstalled(r.Install.Package); !ok {
-				continue
-			}
-			status = " ✓"
-		}
-		fmt.Printf("  %s  %s%s  %s\n", prefix, r.ID, status, mutedStyle.Render(r.Description))
-	}
-	return nil
 }
 
 func doctorCmd() *cobra.Command {
@@ -344,7 +360,82 @@ func configCmd(cfg *config.Config) *cobra.Command {
 			return nil
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "editor <cursor|claude-code|both>",
+		Short: "设置 AI 工具",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			names := map[string]string{"cursor": "Cursor", "claude-code": "Claude Code", "both": "Cursor + Claude Code"}
+			name, ok := names[args[0]]
+			if !ok {
+				return fmt.Errorf("无效选项: %s（可选: cursor, claude-code, both）", args[0])
+			}
+			_ = cfg.SetEditor(config.Editor(args[0]))
+			fmt.Println(successStyle.Render("✓ AI 工具: " + name))
+			return nil
+		},
+	})
 	return cmd
+}
+
+func askEditor(cfg *config.Config) {
+	fmt.Println()
+	fmt.Println("你使用的 AI 编码工具是？")
+	fmt.Println("  1) Cursor")
+	fmt.Println("  2) Claude Code")
+	fmt.Println("  3) 两个都用")
+	fmt.Print("请选择 [1/2/3] (默认: 3): ")
+
+	scanner := bufio.NewScanner(os.Stdin)
+	choice := "3"
+	if scanner.Scan() {
+		input := strings.TrimSpace(scanner.Text())
+		if input != "" {
+			choice = input
+		}
+	}
+
+	editors := map[string]config.Editor{"1": config.EditorCursor, "2": config.EditorClaudeCode, "3": config.EditorBoth}
+	names := map[string]string{"1": "Cursor", "2": "Claude Code", "3": "Cursor + Claude Code"}
+	e, ok := editors[choice]
+	if !ok {
+		e = config.EditorBoth
+		choice = "3"
+	}
+	_ = cfg.SetEditor(e)
+	fmt.Println(successStyle.Render("✓ AI 工具: " + names[choice]))
+	fmt.Println()
+}
+
+func collectPrompts(prompts []recipe.Prompt) map[string]string {
+	if len(prompts) == 0 {
+		return nil
+	}
+	values := make(map[string]string)
+	scanner := bufio.NewScanner(os.Stdin)
+	for _, p := range prompts {
+		for {
+			if p.Default != "" {
+				fmt.Printf("%s (默认: %s): ", p.Ask, p.Default)
+			} else {
+				fmt.Printf("%s: ", p.Ask)
+			}
+			val := ""
+			if scanner.Scan() {
+				val = strings.TrimSpace(scanner.Text())
+			}
+			if val == "" {
+				val = p.Default
+			}
+			if val == "" {
+				fmt.Println(errorStyle.Render("  请输入一个值"))
+				continue
+			}
+			values[p.Key] = val
+			break
+		}
+	}
+	return values
 }
 
 func updateCmd() *cobra.Command {

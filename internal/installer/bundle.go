@@ -10,6 +10,7 @@ import (
 type BundleInstaller struct {
 	registry *recipe.Registry
 	brew     *BrewInstaller
+	npm      *NpmInstaller
 	mcp      *MCPInstaller
 	skill    *SkillInstaller
 	command  *CommandInstaller
@@ -20,6 +21,7 @@ func NewBundleInstaller(reg *recipe.Registry) *BundleInstaller {
 	return &BundleInstaller{
 		registry: reg,
 		brew:     NewBrewInstaller(),
+		npm:      NewNpmInstaller(),
 		mcp:      NewMCPInstaller(),
 		skill:    NewSkillInstaller(),
 		command:  NewCommandInstaller(),
@@ -63,6 +65,12 @@ func (b *BundleInstaller) installOne(rec *recipe.Recipe, promptValues map[string
 	case recipe.TypeCLITool:
 		if rec.Install == nil {
 			return fmt.Errorf("no install config for %s", rec.ID)
+		}
+		if rec.Install.Method == "npm" {
+			if installed, _ := b.npm.IsInstalled(rec.Install.Package); installed {
+				return nil
+			}
+			return b.npm.Install(rec.Install.Package)
 		}
 		if installed, _ := b.brew.IsInstalled(rec.Install.Package); installed {
 			return nil

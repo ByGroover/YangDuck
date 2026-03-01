@@ -4,6 +4,8 @@ type: cli-tool
 description: 更快更友好的 find 替代品
 tags: [search, file, productivity]
 difficulty: beginner
+popularity: 82
+added_at: "2025-01-15"
 install:
   method: brew
   package: fd

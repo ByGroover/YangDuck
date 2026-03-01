@@ -19,6 +19,7 @@ type InstallFlow struct {
 	Registry *recipe.Registry
 	Config   *config.Config
 	Brew     *installer.BrewInstaller
+	Npm      *installer.NpmInstaller
 	MCP      *installer.MCPInstaller
 	Skill    *installer.SkillInstaller
 	Command  *installer.CommandInstaller
@@ -31,6 +32,7 @@ func NewInstallFlow(reg *recipe.Registry, cfg *config.Config) *InstallFlow {
 		Registry: reg,
 		Config:   cfg,
 		Brew:     installer.NewBrewInstaller(),
+		Npm:      installer.NewNpmInstaller(),
 		MCP:      installer.NewMCPInstaller(),
 		Skill:    installer.NewSkillInstaller(),
 		Command:  installer.NewCommandInstaller(),
@@ -64,6 +66,9 @@ func (f *InstallFlow) InstallRecipeSilent(rec recipe.Recipe) error {
 		if rec.Install == nil {
 			return fmt.Errorf("no install config")
 		}
+		if rec.Install.Method == "npm" {
+			return f.Npm.Install(rec.Install.Package)
+		}
 		if err := f.Brew.Install(rec.Install.Package); err != nil {
 			return err
 		}
@@ -91,6 +96,9 @@ func (f *InstallFlow) IsRecipeInstalled(rec recipe.Recipe) (bool, string) {
 	case recipe.TypeCLITool:
 		if rec.Install == nil {
 			return false, ""
+		}
+		if rec.Install.Method == "npm" {
+			return f.Npm.IsInstalled(rec.Install.Package)
 		}
 		return f.Brew.IsInstalled(rec.Install.Package)
 	case recipe.TypeMCP:
@@ -123,8 +131,21 @@ func (f *InstallFlow) installCLITool(rec recipe.Recipe) error {
 		fmt.Println()
 	}
 
-	if installed, ver := f.Brew.IsInstalled(rec.Install.Package); installed {
-		fmt.Printf("  %s %s 已安装 (v%s)\n", s.CheckStyle.Render("✓"), rec.Name, ver)
+	isNpm := rec.Install.Method == "npm"
+	var installed bool
+	var ver string
+	if isNpm {
+		installed, ver = f.Npm.IsInstalled(rec.Install.Package)
+	} else {
+		installed, ver = f.Brew.IsInstalled(rec.Install.Package)
+	}
+
+	if installed {
+		verStr := ""
+		if ver != "" {
+			verStr = " (v" + ver + ")"
+		}
+		fmt.Printf("  %s %s 已安装%s\n", s.CheckStyle.Render("✓"), rec.Name, verStr)
 		fmt.Println()
 		if f.Config.IsBeginner() {
 			fmt.Println(s.NoteStyle.Render("💡 虽然已安装，还是给你看看怎么用:"))
@@ -134,17 +155,27 @@ func (f *InstallFlow) installCLITool(rec recipe.Recipe) error {
 	}
 
 	fmt.Println(s.StepStyle.Render("  ▸ 正在安装 " + rec.Name + "..."))
-	fmt.Println(s.DescStyle.Render("    通过 Homebrew 安装: brew install " + rec.Install.Package))
+	if isNpm {
+		fmt.Println(s.DescStyle.Render("    通过 npm 安装: npm install -g " + rec.Install.Package))
+	} else {
+		fmt.Println(s.DescStyle.Render("    通过 Homebrew 安装: brew install " + rec.Install.Package))
+	}
 	fmt.Println()
 
-	if err := f.Brew.Install(rec.Install.Package); err != nil {
-		return fmt.Errorf("安装失败: %w", err)
-	}
-	if len(rec.Install.PostInstall) > 0 {
-		fmt.Println(s.DescStyle.Render("    运行安装后配置..."))
-		if err := f.Brew.RunPostInstall(rec.Install.PostInstall); err != nil {
-			fmt.Println(s.WarnStyle.Render("    ⚠ 安装后配置有警告: " + err.Error()))
-			fmt.Println(s.DescStyle.Render("    不影响使用，可以忽略"))
+	if isNpm {
+		if err := f.Npm.Install(rec.Install.Package); err != nil {
+			return fmt.Errorf("安装失败: %w", err)
+		}
+	} else {
+		if err := f.Brew.Install(rec.Install.Package); err != nil {
+			return fmt.Errorf("安装失败: %w", err)
+		}
+		if len(rec.Install.PostInstall) > 0 {
+			fmt.Println(s.DescStyle.Render("    运行安装后配置..."))
+			if err := f.Brew.RunPostInstall(rec.Install.PostInstall); err != nil {
+				fmt.Println(s.WarnStyle.Render("    ⚠ 安装后配置有警告: " + err.Error()))
+				fmt.Println(s.DescStyle.Render("    不影响使用，可以忽略"))
+			}
 		}
 	}
 

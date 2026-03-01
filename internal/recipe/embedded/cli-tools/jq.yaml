@@ -4,6 +4,8 @@ type: cli-tool
 description: 命令行 JSON 处理工具，格式化和提取 JSON 数据
 tags: [json, productivity, essential]
 difficulty: beginner
+popularity: 88
+added_at: "2025-01-15"
 install:
   method: brew
   package: jq

@@ -4,6 +4,8 @@ type: mcp
 description: 让 AI 助手直接查询和操作你的 MySQL 数据库
 tags: [database, mysql]
 difficulty: beginner
+popularity: 70
+added_at: "2025-01-15"
 install:
   method: npm
   package: "@benborla29/mcp-server-mysql"

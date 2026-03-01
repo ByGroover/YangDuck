@@ -1,0 +1,22 @@
+id: claude-code
+name: Claude Code
+type: cli-tool
+description: Anthropic 官方 AI 编码助手 CLI，在终端中直接与 Claude 对话编程
+tags: [ai, coding, anthropic, claude]
+difficulty: beginner
+popularity: 95
+featured: true
+added_at: "2025-03-01"
+install:
+  method: npm
+  package: "@anthropic-ai/claude-code"
+quickstart:
+  - title: 启动 Claude Code
+    command: claude
+    explain: 在终端输入 claude 即可进入 AI 对话界面
+  - title: 让 AI 改代码
+    command: claude "帮我重构这个函数"
+    explain: 直接传入指令，Claude 会分析当前目录的代码并执行
+  - title: 查看帮助
+    command: claude --help
+    explain: 了解更多用法和选项

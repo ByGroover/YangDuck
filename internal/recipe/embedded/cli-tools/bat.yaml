@@ -4,6 +4,8 @@ type: cli-tool
 description: 带语法高亮的 cat 替代品，查看文件内容更清晰
 tags: [productivity, file, essential]
 difficulty: beginner
+popularity: 85
+added_at: "2025-01-15"
 install:
   method: brew
   package: bat
