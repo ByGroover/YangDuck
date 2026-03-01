@@ -13,6 +13,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
@@ -27,18 +29,23 @@ jobs:
         env:
           GOOS: darwin
           GOARCH: arm64
-        run: go build -o yduck-darwin-arm64 ./cmd/yduck/
+        run: go build -ldflags "-s -w -X main.version=${{ github.ref_name }}" -o yduck-darwin-arm64 ./cmd/yduck/
 
       - name: Build macOS amd64
         env:
           GOOS: darwin
           GOARCH: amd64
-        run: go build -o yduck-darwin-amd64 ./cmd/yduck/
+        run: go build -ldflags "-s -w -X main.version=${{ github.ref_name }}" -o yduck-darwin-amd64 ./cmd/yduck/
+
+      - name: Generate checksums
+        run: shasum -a 256 yduck-darwin-* > checksums.txt
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          draft: false
           files: |
             yduck-darwin-arm64
             yduck-darwin-amd64
+            checksums.txt
           generate_release_notes: true

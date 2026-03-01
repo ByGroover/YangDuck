@@ -22,10 +22,19 @@ jobs:
       - name: Build index and validate schemas
         run: go run scripts/build-index.go
 
-      - name: Upload recipes index
+      - name: Package recipes
+        run: tar -czf recipes.tar.gz recipes/
+
+      - name: Upload recipes
         uses: softprops/action-gh-release@v2
         with:
           tag_name: recipes-latest
-          files: recipes-index.json
-          body: "Auto-published recipe index"
-          prerelease: true
+          make_latest: false
+          files: |
+            recipes-index.json
+            recipes.tar.gz
+          body: |
+            Auto-published recipe registry.
+
+            - `recipes-index.json` — recipe index for remote fetching
+            - `recipes.tar.gz` — all recipe YAML files
