@@ -7,18 +7,18 @@
 ## 安装
 
 ```bash
-curl -fsSL https://yduck.dev/install | sh
+curl -fsSL https://raw.githubusercontent.com/tc6-01/YangDuck/master/install.sh | sh
 ```
 
 或手动安装：
 
 ```bash
 # macOS arm64 (Apple Silicon)
-curl -L -o /usr/local/bin/yduck https://github.com/yangduck/yduck/releases/latest/download/yduck-darwin-arm64
+curl -L -o /usr/local/bin/yduck https://github.com/tc6-01/YangDuck/releases/latest/download/yduck-darwin-arm64
 chmod +x /usr/local/bin/yduck
 
 # macOS amd64 (Intel)
-curl -L -o /usr/local/bin/yduck https://github.com/yangduck/yduck/releases/latest/download/yduck-darwin-amd64
+curl -L -o /usr/local/bin/yduck https://github.com/tc6-01/YangDuck/releases/latest/download/yduck-darwin-amd64
 chmod +x /usr/local/bin/yduck
 ```
 

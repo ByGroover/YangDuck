@@ -2,7 +2,7 @@ name: Release Recipes
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'recipes/**'
 
@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.24'
 
       - name: Build index and validate schemas
         run: go run scripts/build-index.go
