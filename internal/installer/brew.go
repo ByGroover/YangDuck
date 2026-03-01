@@ -8,7 +8,10 @@ import (
 	ylog "github.com/yangduck/yduck/internal/log"
 )
 
-type BrewInstaller struct{}
+type BrewInstaller struct {
+	cache       map[string]string // pkg -> version, lazily populated
+	cacheLoaded bool
+}
 
 func NewBrewInstaller() *BrewInstaller {
 	return &BrewInstaller{}
@@ -19,20 +22,33 @@ func (b *BrewInstaller) IsAvailable() bool {
 	return err == nil
 }
 
-func (b *BrewInstaller) IsInstalled(pkg string) (bool, string) {
-	out, err := exec.Command("brew", "list", "--versions", pkg).Output()
+func (b *BrewInstaller) loadCache() {
+	if b.cacheLoaded {
+		return
+	}
+	b.cache = make(map[string]string)
+	b.cacheLoaded = true
+	out, err := exec.Command("brew", "list", "--versions").Output()
 	if err != nil {
-		return false, ""
+		return
 	}
-	version := strings.TrimSpace(string(out))
-	if version == "" {
-		return false, ""
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			b.cache[parts[0]] = parts[len(parts)-1]
+		}
 	}
-	parts := strings.Fields(version)
-	if len(parts) >= 2 {
-		return true, parts[len(parts)-1]
-	}
-	return true, version
+}
+
+func (b *BrewInstaller) InvalidateCache() {
+	b.cacheLoaded = false
+	b.cache = nil
+}
+
+func (b *BrewInstaller) IsInstalled(pkg string) (bool, string) {
+	b.loadCache()
+	ver, ok := b.cache[pkg]
+	return ok, ver
 }
 
 func (b *BrewInstaller) Install(pkg string) error {
@@ -45,6 +61,7 @@ func (b *BrewInstaller) Install(pkg string) error {
 		return err
 	}
 	ylog.S.Infow("brew install succeeded", "package", pkg)
+	b.InvalidateCache()
 	return nil
 }
 

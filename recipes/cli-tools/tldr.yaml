@@ -4,6 +4,8 @@ type: cli-tool
 description: 简化版命令帮助手册，用实例教你怎么用命令
 tags: [help, productivity, essential]
 difficulty: beginner
+popularity: 78
+added_at: "2025-01-15"
 install:
   method: brew
   package: tldr

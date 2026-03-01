@@ -4,6 +4,9 @@ type: mcp
 description: 让 AI 助手安全地读写你的本地文件
 tags: [filesystem, file]
 difficulty: beginner
+popularity: 88
+added_at: "2025-01-15"
+featured: true
 install:
   method: npm
   package: "@anthropic/mcp-filesystem"

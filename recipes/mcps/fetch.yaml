@@ -4,6 +4,9 @@ type: mcp
 description: 让 AI 助手访问网页和 API，获取实时信息
 tags: [http, api, web]
 difficulty: beginner
+popularity: 92
+added_at: "2025-01-15"
+featured: true
 install:
   method: npm
   package: "@anthropic/mcp-fetch"

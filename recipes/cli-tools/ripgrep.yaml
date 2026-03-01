@@ -4,6 +4,9 @@ type: cli-tool
 description: 超快的文本搜索工具，比 grep 快几十倍
 tags: [search, productivity, essential]
 difficulty: beginner
+popularity: 90
+added_at: "2025-01-15"
+featured: true
 install:
   method: brew
   package: ripgrep

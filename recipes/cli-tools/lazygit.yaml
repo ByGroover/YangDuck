@@ -4,6 +4,9 @@ type: cli-tool
 description: 终端 Git 图形界面，让 Git 操作变得简单直观
 tags: [git, productivity, essential]
 difficulty: beginner
+popularity: 87
+added_at: "2025-01-15"
+featured: true
 install:
   method: brew
   package: lazygit

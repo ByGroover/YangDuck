@@ -73,6 +73,11 @@ func (c *Config) IsBeginner() bool {
 	return c.Mode != ModeAdvanced
 }
 
+func (c *Config) IsFirstTime() bool {
+	_, err := os.Stat(filePath())
+	return os.IsNotExist(err)
+}
+
 func (c *Config) SetMode(m Mode) error {
 	c.Mode = m
 	return c.Save()

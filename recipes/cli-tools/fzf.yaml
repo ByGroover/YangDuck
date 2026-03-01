@@ -4,6 +4,9 @@ type: cli-tool
 description: 命令行模糊搜索工具，让你快速找到文件、历史命令
 tags: [search, productivity, essential]
 difficulty: beginner
+popularity: 95
+added_at: "2025-01-15"
+featured: true
 install:
   method: brew
   package: fzf

@@ -4,6 +4,8 @@ type: cli-tool
 description: 人性化的 HTTP 客户端，比 curl 更易用
 tags: [http, api, productivity]
 difficulty: beginner
+popularity: 75
+added_at: "2025-01-15"
 install:
   method: brew
   package: httpie

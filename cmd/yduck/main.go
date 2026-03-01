@@ -44,8 +44,9 @@ func main() {
 
 	root.AddCommand(
 		installCmd(reg, cfg),
-		searchCmd(reg),
-		listCmd(reg),
+		searchCmd(reg, cfg),
+		browseCmd(reg, cfg),
+		listCmd(reg, cfg),
 		doctorCmd(),
 		configCmd(cfg),
 		updateCmd(),
@@ -171,62 +172,97 @@ func installBundle(reg *recipe.Registry, id string) error {
 	return nil
 }
 
-func searchCmd(reg *recipe.Registry) *cobra.Command {
+func browseCmd(reg *recipe.Registry, cfg *config.Config) *cobra.Command {
+	var installedFlag bool
+	cmd := &cobra.Command{
+		Use:   "browse [category]",
+		Short: "浏览配方（进入 TUI 浏览界面）",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if installedFlag {
+				app := tui.NewApp(reg, cfg)
+				return app.RunBrowse("__installed__")
+			}
+			category := ""
+			if len(args) > 0 {
+				category = args[0]
+			}
+			app := tui.NewApp(reg, cfg)
+			return app.RunBrowse(category)
+		},
+	}
+	cmd.Flags().BoolVar(&installedFlag, "installed", false, "进入已安装页")
+	return cmd
+}
+
+func searchCmd(reg *recipe.Registry, cfg *config.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "search <keyword>",
-		Short: "搜索配方",
+		Short: "搜索配方（进入 TUI 搜索界面）",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			results := reg.Search(args[0])
-			if len(results) == 0 {
-				fmt.Println(mutedStyle.Render("未找到匹配的配方"))
-				return
-			}
-			for _, r := range results {
-				fmt.Printf("  %s  %s\n", r.ID, mutedStyle.Render(r.Description))
-			}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			app := tui.NewApp(reg, cfg)
+			return app.RunSearch(args[0])
 		},
 	}
 }
 
-func listCmd(reg *recipe.Registry) *cobra.Command {
+func listCmd(reg *recipe.Registry, cfg *config.Config) *cobra.Command {
 	var installedFlag bool
 	var bundlesFlag bool
+	var quietFlag bool
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "列出可用配方",
-		Run: func(cmd *cobra.Command, args []string) {
+		Use:     "list",
+		Short:   "列出可用配方（browse 的别名）",
+		Aliases: []string{},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if quietFlag {
+				return listQuiet(reg, installedFlag, bundlesFlag)
+			}
+			category := ""
 			if bundlesFlag {
-				for _, b := range reg.Bundles() {
-					fmt.Printf("  📦 %s  %s  (%d 个工具)\n", b.ID, mutedStyle.Render(b.Description), len(b.Includes))
-				}
-				return
+				category = "bundle"
 			}
-			typeNames := map[recipe.RecipeType]string{
-				recipe.TypeCLITool: "🔧 CLI",
-				recipe.TypeMCP:     "🔌 MCP",
-				recipe.TypeSkill:   "📝 Skill",
-				recipe.TypeCommand: "⌨️  Command",
-				recipe.TypeRule:    "📏 Rule",
-				recipe.TypeBundle:  "📦 Bundle",
-			}
-			brew := installer.NewBrewInstaller()
-			for _, r := range reg.All() {
-				prefix := typeNames[r.Type]
-				status := ""
-				if installedFlag && r.Type == recipe.TypeCLITool && r.Install != nil {
-					if ok, _ := brew.IsInstalled(r.Install.Package); !ok {
-						continue
-					}
-					status = " ✓"
-				}
-				fmt.Printf("  %s  %s%s  %s\n", prefix, r.ID, status, mutedStyle.Render(r.Description))
-			}
+			app := tui.NewApp(reg, cfg)
+			return app.RunBrowse(category)
 		},
 	}
 	cmd.Flags().BoolVar(&installedFlag, "installed", false, "仅显示已安装的")
 	cmd.Flags().BoolVar(&bundlesFlag, "bundles", false, "仅显示套餐")
+	cmd.Flags().BoolVar(&quietFlag, "quiet", false, "纯文本输出（给脚本用）")
 	return cmd
+}
+
+func listQuiet(reg *recipe.Registry, installedOnly bool, bundlesOnly bool) error {
+	typeNames := map[recipe.RecipeType]string{
+		recipe.TypeCLITool: "🔧 CLI",
+		recipe.TypeMCP:     "🔌 MCP",
+		recipe.TypeSkill:   "📝 Skill",
+		recipe.TypeCommand: "⌨️  Command",
+		recipe.TypeRule:    "📏 Rule",
+		recipe.TypeBundle:  "📦 Bundle",
+	}
+
+	if bundlesOnly {
+		for _, b := range reg.Bundles() {
+			fmt.Printf("  📦 %s  %s  (%d 个工具)\n", b.ID, mutedStyle.Render(b.Description), len(b.Includes))
+		}
+		return nil
+	}
+
+	brew := installer.NewBrewInstaller()
+	for _, r := range reg.All() {
+		prefix := typeNames[r.Type]
+		status := ""
+		if installedOnly && r.Type == recipe.TypeCLITool && r.Install != nil {
+			if ok, _ := brew.IsInstalled(r.Install.Package); !ok {
+				continue
+			}
+			status = " ✓"
+		}
+		fmt.Printf("  %s  %s%s  %s\n", prefix, r.ID, status, mutedStyle.Render(r.Description))
+	}
+	return nil
 }
 
 func doctorCmd() *cobra.Command {
@@ -238,8 +274,8 @@ func doctorCmd() *cobra.Command {
 			fmt.Println("🔍 环境检查")
 			fmt.Println()
 			checks := []struct {
-				name    string
-				check   func() (bool, string)
+				name  string
+				check func() (bool, string)
 			}{
 				{"Homebrew", func() (bool, string) {
 					out, err := exec.Command("brew", "--version").Output()

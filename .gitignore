@@ -1,8 +1,12 @@
 # 编译产物
 /yduck
+/tuidebug
 yduck-darwin-*
 yduck-linux-*
 *.exe
+
+# 调试
+cmd/tuidebug/
 
 # 生成文件
 recipes-index.json
