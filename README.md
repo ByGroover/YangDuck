@@ -10,6 +10,9 @@
 
 ```bash
 brew install tc6-01/yduck/yduck
+
+# 更新到最新版
+brew update && brew upgrade yduck
 ```
 
 ### 一键脚本
