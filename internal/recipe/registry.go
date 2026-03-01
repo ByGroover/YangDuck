@@ -1,12 +1,28 @@
 package recipe
 
 import (
+	"sort"
 	"strings"
 )
 
 type Registry struct {
 	recipes map[string]Recipe
 	byType  map[RecipeType][]Recipe
+}
+
+type ListOptions struct {
+	Type     RecipeType
+	Tag      string
+	Page     int
+	PageSize int
+	SortBy   string // "name", "popularity", "added_at"
+}
+
+type ListResult struct {
+	Items      []Recipe
+	Total      int
+	Page       int
+	TotalPages int
 }
 
 func NewRegistry() *Registry {

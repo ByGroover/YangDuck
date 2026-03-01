@@ -18,6 +18,9 @@ type Recipe struct {
 	Description string     `yaml:"description" json:"description"`
 	Tags        []string   `yaml:"tags,omitempty" json:"tags,omitempty"`
 	Difficulty  string     `yaml:"difficulty,omitempty" json:"difficulty,omitempty"`
+	Featured    bool       `yaml:"featured,omitempty" json:"featured,omitempty"`
+	Popularity  int        `yaml:"popularity,omitempty" json:"popularity,omitempty"`
+	AddedAt     string     `yaml:"added_at,omitempty" json:"added_at,omitempty"`
 	Install     *Install   `yaml:"install,omitempty" json:"install,omitempty"`
 	Targets     *Targets   `yaml:"targets,omitempty" json:"targets,omitempty"`
 	Prompts     []Prompt   `yaml:"prompts,omitempty" json:"prompts,omitempty"`

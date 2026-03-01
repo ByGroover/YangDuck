@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFD700"))
+	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#22d3ee"))
 	descStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#808080"))
 )
 

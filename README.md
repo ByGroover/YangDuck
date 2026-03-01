@@ -6,11 +6,19 @@
 
 ## 安装
 
+### Homebrew（推荐）
+
+```bash
+brew install tc6-01/yduck/yduck
+```
+
+### 一键脚本
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tc6-01/YangDuck/master/install.sh | sh
 ```
 
-或手动安装：
+### 手动安装
 
 ```bash
 # macOS arm64 (Apple Silicon)

@@ -3,8 +3,8 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	ColorPrimary   = lipgloss.Color("#FFD700")
-	ColorSecondary = lipgloss.Color("#87CEEB")
+	ColorPrimary   = lipgloss.Color("#22d3ee")
+	ColorSecondary = lipgloss.Color("#818cf8")
 	ColorSuccess   = lipgloss.Color("#32CD32")
 	ColorError     = lipgloss.Color("#FF6347")
 	ColorMuted     = lipgloss.Color("#808080")
@@ -46,5 +46,9 @@ var (
 )
 
 const DuckBanner = `
-  🐤 YangDuck
+      __
+     ( o>
+     //\
+     V_/_
+    yduck
 `
